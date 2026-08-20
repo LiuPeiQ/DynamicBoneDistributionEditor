@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Configuration;
@@ -32,7 +33,7 @@ namespace DynamicBoneDistributionEditor
     {
         public const string PluginName = "DynamicBoneDistributionEditor";
         public const string GUID = "org.njaecha.plugins.dbde";
-        public const string Version = "2.0.0";
+        public const string Version = "2.0.5";
 
         internal new static ManualLogSource Logger;
         internal static DBDE Instance;
@@ -112,6 +113,71 @@ namespace DynamicBoneDistributionEditor
             SceneManager.sceneLoaded += (s, lsm) => createStudioButton(s.name);
             ScreenshotManager.OnPreCapture += ScreenshotManager_OnPreCapture;
             ScreenshotManager.OnPostCapture += ScreenshotManager_OnPostCapture;
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.F6))
+            {
+                ExportLowerBodySkirtFromHotkey();
+            }
+
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                ToggleLowerBodySkirtSequenceCapture();
+            }
+        }
+
+        // F8 captures the complete Update -> LateUpdate transition so the
+        // Blender solver can be checked against the game's actual state.
+        private static void ToggleLowerBodySkirtSequenceCapture()
+        {
+            try
+            {
+                string message = DBDERuntimeSequenceExporter.Toggle("F8 continuous runtime capture");
+                Logger.LogInfo(message);
+                WriteLowerSkirtExportStatus(message);
+            }
+            catch (Exception ex)
+            {
+                string message = "F8 continuous runtime capture failed: " + ex;
+                Logger.LogError(message);
+                WriteLowerSkirtExportStatus(message);
+            }
+        }
+
+        // The main game has no DBDE window, so keep a direct export route for
+        // capturing the exact runtime skirt state used by the game.
+        private static void ExportLowerBodySkirtFromHotkey()
+        {
+            try
+            {
+                string path = DBDERuntimeExporter.ExportLowerBodySkirt("F6 hotkey");
+                string message = "F6 lower-body skirt JSON exported: " + path;
+                Logger.LogInfo(message);
+                WriteLowerSkirtExportStatus(message);
+            }
+            catch (Exception ex)
+            {
+                string message = "F6 lower-body skirt JSON export failed: " + ex;
+                Logger.LogError(message);
+                WriteLowerSkirtExportStatus(message);
+            }
+        }
+
+        internal static void WriteLowerSkirtExportStatus(string message)
+        {
+            try
+            {
+                string directory = Path.Combine(Paths.ConfigPath, "DBDE_RuntimeSnapshots");
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(
+                    Path.Combine(directory, "lower_skirt_export_status.txt"),
+                    DateTime.Now.ToString("o") + Environment.NewLine + message);
+            }
+            catch
+            {
+            }
         }
 
         // borrowed from Material Editor
@@ -260,7 +326,7 @@ namespace DynamicBoneDistributionEditor
         public static string GetChaControlQualifiedName(this DynamicBone dynamicBone)
         {
             if (!dynamicBone.m_Root) return null;
-            if (cacheA.TryGetValue(dynamicBone, out string value) && value.EndsWith(dynamicBone.m_Root.name)) return value;
+            if (cacheC.TryGetValue(dynamicBone, out string value) && value.EndsWith(dynamicBone.m_Root.name)) return value;
             ChaControl component = dynamicBone.m_Root?.transform.GetComponentsInParent<ChaControl>(true)?[0];
             if (!component) return null;
             value = component.transform.GetPathToChild(dynamicBone.m_Root);

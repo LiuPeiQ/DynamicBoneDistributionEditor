@@ -23,6 +23,33 @@ namespace DynamicBoneDistributionEditor
 {
     public class DBDECharaController : CharaCustomFunctionController
     {
+        private static readonly int[] GameInitialBodyShapeIndices =
+        {
+            0, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+            2, 3, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 37, 38, 39, 40, 41, 42, 43, 28,
+            29, 30, 31, 32, 33, 34, 35, 36
+        };
+
+        // BP_SAC_Innie runtime9048 protected import snapshot, in Maker UI order.
+        private static readonly float[] GameInitialBodyShapeValues =
+        {
+            100f, 84f, 68f, 40f, 100f, 51f, 72f, 31f,
+            58f, 0f, 50f, 16f, 61f, 55f, 7f, 38f,
+            55f, 37f, 56f, 56f, 51f, 54f, 37f, 45f,
+            58f, 50f, 48f, 49f, 49f, 59f, 49f, 49f,
+            50f, 51f, 51f, 16f, 49f, 55f, 51f, 46f,
+            50f, 55f, 47f, 48f
+        };
+
+        private float[] _bodyShapeBackup;
+        private float _bustSoftnessBackup;
+        private float _bustWeightBackup;
+        private float _areolaSizeBackup;
+        private float _nipStandRateBackup;
+
+        internal bool HasGameInitialBodyBackup => _bodyShapeBackup != null;
+
         internal readonly Dictionary<int, List<DBDEDynamicBoneEdit>> DistributionEdits = new Dictionary<int, List<DBDEDynamicBoneEdit>>();
 
         // <outfit, [accessory edits, normal edits, DBE-Data]>
@@ -70,6 +97,10 @@ namespace DynamicBoneDistributionEditor
         protected override void OnReload(GameMode currentGameMode, bool maintainState)
         {
             IsLoading = true;
+
+            // A reload may replace the character data behind this controller.
+            // Never allow a temporary preset backup to leak across card loads.
+            _bodyShapeBackup = null;
 
             DistributionEdits.Clear();
             DistributionEditsNotLoaded.Clear();
@@ -677,10 +708,80 @@ namespace DynamicBoneDistributionEditor
 
         public void OpenDBDE()
         {
+            // This build is used for runtime body/clothes inspection. The upstream
+            // default excludes all non-accessory DynamicBones until card data opts in.
+            NonAccessoryBonesActive[ChaControl.fileStatus.coordinateType] = true;
             RefreshBoneList("UI Open");
             DBDE.UI.Open(() => DistributionEdits[ChaControl.fileStatus.coordinateType], () => RefreshBoneList("UI Button"));
             DBDE.UI.TitleAppendix = ChaControl.chaFile.GetFancyCharacterName();
             DBDE.UI.referencedChara = this;
+        }
+
+        internal bool ToggleGameInitialBodyPreset(out string message)
+        {
+            if (ChaControl == null || ChaControl.chaFile == null || ChaControl.chaFile.custom == null)
+            {
+                message = "No live character is attached to the DBDE window.";
+                return false;
+            }
+
+            ChaFileBody body = ChaControl.chaFile.custom.body;
+            if (body == null || body.shapeValueBody == null || body.shapeValueBody.Length < 44)
+            {
+                message = "The selected character has no compatible 44-value body shape array.";
+                return false;
+            }
+
+            if (_bodyShapeBackup == null)
+            {
+                _bodyShapeBackup = (float[])body.shapeValueBody.Clone();
+                _bustSoftnessBackup = body.bustSoftness;
+                _bustWeightBackup = body.bustWeight;
+                _areolaSizeBackup = body.areolaSize;
+                _nipStandRateBackup = ChaControl.chaFile.status.nipStandRate;
+
+                for (int i = 0; i < GameInitialBodyShapeValues.Length; i++)
+                {
+                    ChaControl.SetShapeBodyValue(
+                        GameInitialBodyShapeIndices[i],
+                        Mathf.Clamp01(GameInitialBodyShapeValues[i] * 0.01f));
+                }
+                body.bustSoftness = 0.5f;
+                body.bustWeight = 0.5f;
+                body.areolaSize = 0.5f;
+                ChaControl.ChangeNipRate(0f);
+                RefreshBodyAfterPreset(body);
+                message = "Applied BP_SAC_Innie game-initial body values. Click again to restore the previous body.";
+                return true;
+            }
+
+            float[] restore = _bodyShapeBackup;
+            _bodyShapeBackup = null;
+            for (int i = 0; i < restore.Length; i++)
+                ChaControl.SetShapeBodyValue(i, restore[i]);
+            body.bustSoftness = _bustSoftnessBackup;
+            body.bustWeight = _bustWeightBackup;
+            body.areolaSize = _areolaSizeBackup;
+            ChaControl.ChangeNipRate(_nipStandRateBackup);
+            RefreshBodyAfterPreset(body);
+            message = "Restored the body values cached before the game-initial preset.";
+            return true;
+        }
+
+        private void RefreshBodyAfterPreset(ChaFileBody body)
+        {
+            ChaControl.UpdateShapeBody();
+            ChaControl.UpdateShapeBodyCalcForce();
+            ChaControl.ChangeSettingAreolaSize();
+            ChaControl.UpdateBustSoftnessAndGravity();
+            ChaControl.ReSetupDynamicBoneBust();
+            ChaControl.ResetDynamicBoneAll();
+
+            DBDE.Logger.LogInfo(
+                $"Body preset refresh complete: height={body.shapeValueBody[0]:F5}, " +
+                $"bust={body.shapeValueBody[4]:F5}, softness={body.bustSoftness:F5}, " +
+                $"weight={body.bustWeight:F5}, areola={body.areolaSize:F5}, " +
+                $"nipStand={ChaControl.chaFile.status.nipStandRate:F5}");
         }
 
         public IEnumerator RefreshBoneListDelayed()
@@ -720,6 +821,9 @@ namespace DynamicBoneDistributionEditor
                     .ToList().ForEach(pair => {
                         DistributionEdits[outfit].Add(new DBDEDynamicBoneEdit(() => WouldYouBeSoKindTohandMeTheDynamicBonePlease(pair.Key), new DBDEDynamicBoneEdit.EditHolder(this)) { ReidentificationData = pair.Key }); 
                     });
+
+                if (callSource == "UI Open")
+                    DBDE.Logger.LogInfo($"DBDE detected {nonAccDBs.Count} body/clothes DynamicBone root(s) on outfit {outfit}.");
             }
             
 

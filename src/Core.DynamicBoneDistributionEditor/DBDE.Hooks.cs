@@ -87,5 +87,35 @@ namespace DynamicBoneDistributionEditor
             GameObject clothesGameObject = t.gameObject;
             __instance.GetComponent<DBDECharaController>()?.ClothesChanged(clothesGameObject);
         }
+
+        // Animator evaluation happens after DynamicBone.Update().  Capture
+        // immediately before LateUpdate so references are the real solver input.
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(DynamicBone), "LateUpdate")]
+        private static void DynamicBoneLateUpdatePrefix(DynamicBone __instance)
+        {
+            DBDERuntimeSequenceExporter.NotifyAnimatorInput(__instance);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(DynamicBone), "LateUpdate")]
+        private static void DynamicBoneLateUpdatePostfix(DynamicBone __instance)
+        {
+            DBDERuntimeSequenceExporter.NotifyLateUpdate(__instance);
+        }
+
+        [HarmonyPrefix]
+        [HarmonyPatch(typeof(DynamicBone_Ver02), "LateUpdate")]
+        private static void DynamicBoneVer02LateUpdatePrefix(DynamicBone_Ver02 __instance)
+        {
+            DBDEVer02RuntimeCapture.NotifyAnimatorInput(__instance);
+        }
+
+        [HarmonyPostfix]
+        [HarmonyPatch(typeof(DynamicBone_Ver02), "LateUpdate")]
+        private static void DynamicBoneVer02LateUpdatePostfix(DynamicBone_Ver02 __instance)
+        {
+            DBDEVer02RuntimeCapture.NotifyLateUpdate(__instance);
+        }
     }
 }

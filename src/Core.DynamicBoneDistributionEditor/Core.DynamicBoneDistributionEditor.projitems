@@ -18,6 +18,10 @@
     <Compile Include="$(MSBuildThisFileDirectory)DBDE.DynamicBoneEdit.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DBDE.SerialisableKeyframe.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DBDE.UI.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DBDE.RuntimeExporter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DBDE.MotionRuntimeExporter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DBDE.RuntimeSequenceExporter.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)DBDE.Ver02RuntimeCapture.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DynamicBoneEditor.Data.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)EditableList.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)EditableValue.cs" />

@@ -86,7 +86,7 @@ namespace DynamicBoneDistributionEditor
         private Camera rCam;
 
 
-        private Rect windowRect = new Rect(100, 100, 650, 450);
+        private Rect windowRect = new Rect(100, 100, 800, 450);
         private Vector2 LeftSideScroll = new Vector2();
         private Vector2 RightSideScroll = new Vector2();
 
@@ -193,9 +193,9 @@ namespace DynamicBoneDistributionEditor
                     _beenHiddenForFrames++; 
                     RefreshBoneList.Invoke();
                 }
-                if (draw && !DBDES.IsNullOrEmpty())
+                if (draw)
                 {
-                    if (DBDES.Count <= currentIndex) SetCurrentRightSide(DBDES.Count - 1);
+                    if (!DBDES.IsNullOrEmpty() && DBDES.Count <= currentIndex) SetCurrentRightSide(DBDES.Count - 1);
                     _beenHiddenForFrames = 0;
                     windowRect = GUI.Window(5858350, windowRect, WindowFunction, $"DBDE v{DBDE.Version} - {TitleAppendix}", KKAPI.Utilities.IMGUIUtils.SolidBackgroundGuiSkin.window);
                 }
@@ -310,12 +310,6 @@ namespace DynamicBoneDistributionEditor
             Color guic = GUI.color;
             #endregion
             List<DBDEDynamicBoneEdit> DBDES = DBDEGetter.Invoke();
-            if (DBDES.IsNullOrEmpty())
-            {
-                //RefreshBoneList.Invoke();
-                //close();
-                return;
-            }
 
             if (GUI.Button(new Rect(windowRect.width - 18, 2, 15, 15), new GUIContent("X"), buttonStyle))
             {
@@ -330,11 +324,120 @@ namespace DynamicBoneDistributionEditor
             {
                 bakeMode = !bakeMode;
             }
+            if (GUI.Button(new Rect(190, 1, 90, 15), new GUIContent("Rescan ALL", "Rescan accessories, body and clothes DynamicBone components.")))
+            {
+                RefreshBoneList.Invoke();
+            }
+            if (GUI.Button(new Rect(285, 1, 145, 15), new GUIContent("Export Runtime JSON", "Export every loaded scene DynamicBone, including components not registered by DBDE.")))
+            {
+                try
+                {
+                    DBDERuntimeExporter.Export(DBDES, TitleAppendix);
+                }
+                catch (Exception ex)
+                {
+                    DBDE.Logger.LogError("Runtime JSON export failed: " + ex);
+                }
+            }
+            if (GUI.Button(new Rect(435, 1, 145, 15), new GUIContent("Export Motion JSON", "Export Studio animation state, current clips, Studio anime IDs and YureCtrl state.")))
+            {
+                try
+                {
+                    DBDEMotionRuntimeExporter.Export();
+                }
+                catch (Exception ex)
+                {
+                    DBDE.Logger.LogError("Motion runtime JSON export failed: " + ex);
+                }
+            }
+            if (GUI.Button(new Rect(585, 20, 180, 15), new GUIContent("Export Lower Skirt JSON", "Export only gm_top lower-body Dress_* DynamicBone chains and their referenced colliders.")))
+            {
+                try
+                {
+                    DBDERuntimeExporter.ExportLowerBodySkirt(TitleAppendix);
+                }
+                catch (Exception ex)
+                {
+                    DBDE.Logger.LogError("Lower-body skirt runtime JSON export failed: " + ex);
+                }
+            }
+#if false
+            string bodyPresetButton = referencedChara != null && referencedChara.HasGameInitialBodyBackup
+                ? "鎭㈠涔嬪墠浣撳瀷"
+                : "搴旂敤娓告垙鍒濆浣撳瀷";
+            if (GUI.Button(new Rect(585, 1, 180, 15), new GUIContent(
+                bodyPresetButton,
+                "浣跨敤娓告垙鍘熺敓 ShapeBody 娴佺▼搴旂敤 BP_SAC_Innie 鐨?44 椤规父鎴忓垵濮嬩綋鍨嬶紱鍐嶆鐐瑰嚮鍙仮澶嶄箣鍓嶄綋鍨嬨€?)))
+            {
+                if (referencedChara == null)
+                {
+                    DBDE.Logger.LogWarning("Game-initial body preset is available only when DBDE is opened for a character.");
+                }
+                else
+                {
+                    try
+                    {
+                        if (referencedChara.ToggleGameInitialBodyPreset(out string message))
+                        {
+                            DBDE.Logger.LogInfo(message);
+                            RefreshBoneList?.Invoke();
+                        }
+                        else
+                        {
+                            DBDE.Logger.LogWarning(message);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DBDE.Logger.LogError("Game-initial body preset failed: " + ex);
+                    }
+                }
+            }
 
-            GUI.Box(new Rect(new Vector2(5, 20), new Vector2(windowRect.width / 6 * 2 + 5, windowRect.height - 25)), "");
-            GUI.Box(new Rect(new Vector2(5 + (windowRect.width / 6 * 2 + 5), 20), new Vector2(windowRect.width - (windowRect.width / 6 * 2 + 10)-5, windowRect.height - 25)), "");
+#endif
+            string bodyPresetButton = referencedChara != null && referencedChara.HasGameInitialBodyBackup
+                ? "\u6062\u590D\u4E4B\u524D\u4F53\u578B"
+                : "\u5E94\u7528\u6E38\u620F\u521D\u59CB\u4F53\u578B";
+            if (GUI.Button(new Rect(585, 1, 180, 15), new GUIContent(
+                bodyPresetButton,
+                "\u4F7F\u7528\u6E38\u620F\u539F\u751F ShapeBody \u6D41\u7A0B\u5E94\u7528 BP_SAC_Innie \u7684 44 \u9879\u6E38\u620F\u521D\u59CB\u4F53\u578B\uFF1B\u518D\u6B21\u70B9\u51FB\u53EF\u6062\u590D\u4E4B\u524D\u4F53\u578B\u3002")))
+            {
+                if (referencedChara == null)
+                {
+                    DBDE.Logger.LogWarning("Game-initial body preset is available only when DBDE is opened for a character.");
+                }
+                else
+                {
+                    try
+                    {
+                        if (referencedChara.ToggleGameInitialBodyPreset(out string message))
+                        {
+                            DBDE.Logger.LogInfo(message);
+                            RefreshBoneList?.Invoke();
+                        }
+                        else
+                        {
+                            DBDE.Logger.LogWarning(message);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DBDE.Logger.LogError("Game-initial body preset failed: " + ex);
+                    }
+                }
+            }
 
-            GUILayout.BeginArea(new Rect(new Vector2(5, 20), windowRect.size - new Vector2(15, 25)));
+            if (DBDES.IsNullOrEmpty())
+            {
+                GUI.Label(new Rect(10, 45, windowRect.width - 20, 40), "No DBDE edit groups were registered. Use Rescan ALL, or export the loaded scene directly.");
+                GUI.DragWindow(new Rect(0, 0, 10000, 20));
+                return;
+            }
+
+            GUI.Box(new Rect(new Vector2(5, 40), new Vector2(windowRect.width / 6 * 2 + 5, windowRect.height - 45)), "");
+            GUI.Box(new Rect(new Vector2(5 + (windowRect.width / 6 * 2 + 5), 40), new Vector2(windowRect.width - (windowRect.width / 6 * 2 + 10)-5, windowRect.height - 45)), "");
+
+            GUILayout.BeginArea(new Rect(new Vector2(5, 40), windowRect.size - new Vector2(15, 45)));
             GUILayout.BeginHorizontal();
 
             #region Left Side
